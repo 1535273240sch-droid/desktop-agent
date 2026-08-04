@@ -1,1 +1,25 @@
+# Build output
+dist/
+node_modules/
+
+# Rust
+src-tauri/target/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env
+.env
+.env.local
+
 nuphus-mcp/
