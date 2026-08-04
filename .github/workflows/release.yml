@@ -16,10 +16,13 @@ jobs:
         include:
           - platform: ubuntu-latest
             artifact_name: linux
+            bundle_type: deb
           - platform: windows-latest
             artifact_name: windows
+            bundle_type: msi
           - platform: macos-latest
             artifact_name: macos
+            bundle_type: dmg
 
     steps:
       - name: Checkout source
@@ -34,7 +37,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      # ==================== Linux 依赖 ====================
       - name: Install system dependencies (Ubuntu)
         if: matrix.platform == 'ubuntu-latest'
         run: |
@@ -50,27 +52,30 @@ jobs:
             libssl-dev \
             libudev-dev
 
-      # ==================== 构建 ====================
       - name: Install npm dependencies
         run: npm ci
 
       - name: Build Tauri app
-        run: npx tauri build
+        run: npm run tauri build -- --bundles ${{ matrix.bundle_type }}
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
-      # ==================== 列出构建产物 ====================
       - name: List build artifacts
-        run: find src-tauri/target/release/bundle -type f 2>/dev/null || echo "No bundle directory"
+        run: |
+          echo "=== Build output ==="
+          find src-tauri/target/release/bundle -type f 2>/dev/null || echo "No bundle directory"
+          echo "=== Done ==="
 
-      # ==================== 上传产物 ====================
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: desktop-agent-${{ matrix.artifact_name }}
-          path: src-tauri/target/release/bundle/**
+          path: |
+            src-tauri/target/release/bundle/deb/
+            src-tauri/target/release/bundle/msi/
+            src-tauri/target/release/bundle/dmg/
           retention-days: 7
-          if-no-files-found: warn
+          if-no-files-found: error
 
   release:
     name: Create GitHub Release
@@ -92,77 +97,33 @@ jobs:
         run: |
           VERSION="${{ github.ref_name }}"
           DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
           cat > latest.json << EOF
           {
             "version": "${VERSION}",
-            "notes": "Desktop Agent ${VERSION} - 桌面端 AI Agent 应用",
+            "notes": "Desktop Agent ${VERSION}",
             "pub_date": "${DATE}",
             "platforms": {}
           }
           EOF
-
-          # Linux
-          if ls artifacts/desktop-agent-linux/*.deb 1>/dev/null 2>&1; then
-            echo "Found Linux .deb"
-          fi
-          if ls artifacts/desktop-agent-linux/*.AppImage 1>/dev/null 2>&1; then
-            echo "Found Linux .AppImage"
-          fi
-
-          # Windows
-          if ls artifacts/desktop-agent-windows/*.msi 1>/dev/null 2>&1; then
-            echo "Found Windows .msi"
-          fi
-          if ls artifacts/desktop-agent-windows/*.msix 1>/dev/null 2>&1; then
-            echo "Found Windows .msix"
-          fi
-          if ls artifacts/desktop-agent-windows/*.exe 1>/dev/null 2>&1; then
-            echo "Found Windows .exe"
-          fi
-
-          # macOS
-          if ls artifacts/desktop-agent-macos/*.dmg 1>/dev/null 2>&1; then
-            echo "Found macOS .dmg"
-          fi
-          if ls artifacts/desktop-agent-macos/*.app 1>/dev/null 2>&1; then
-            echo "Found macOS .app"
-          fi
 
       - name: Upload all artifacts to Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             latest.json
-            artifacts/desktop-agent-linux/**/*.deb
-            artifacts/desktop-agent-linux/**/*.AppImage
-            artifacts/desktop-agent-linux/**/*.sig
-            artifacts/desktop-agent-windows/**/*.msi
-            artifacts/desktop-agent-windows/**/*.msix
-            artifacts/desktop-agent-windows/**/*.exe
-            artifacts/desktop-agent-windows/**/*.sig
-            artifacts/desktop-agent-macos/**/*.dmg
-            artifacts/desktop-agent-macos/**/*.app
-            artifacts/desktop-agent-macos/**/*.sig
+            artifacts/desktop-agent-linux/deb/*.deb
+            artifacts/desktop-agent-windows/msi/*.msi
+            artifacts/desktop-agent-macos/dmg/*.dmg
           body: |
             ## Desktop Agent ${{ github.ref_name }}
 
-            桌面端 AI Agent 应用，支持：
-            - 🎙️ 实时语音交互（录音识别 + TTS 合成）
-            - 🖼️ 识图 / 生图（阶跃星辰 API）
-            - 🧠 本地记忆系统（思维导图可视化）
-            - 🔧 技能包扩展 + 子 Agent
-            - 🐳 Docker 沙箱环境
-            - 🎨 自定义主题 / 字体 / 开机动画
-            - 🛡️ 安全模式 / 完全模式
+            桌面端 AI Agent 应用。请根据操作系统选择安装包。
 
-            ## 更新说明
-            应用启动后会自动检查更新，发现新版本时会提示下载安装。
+            - **Linux**: `.deb`
+            - **Windows**: `.msi`
+            - **macOS**: `.dmg`
 
-            ## Assets
-            请根据你的操作系统选择对应的安装包下载。
-
-      - name: Create "latest" tag for update endpoint
+      - name: Create "latest" tag
         uses: rickstaa/action-create-tag@v1
         with:
           tag: latest
