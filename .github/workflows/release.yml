@@ -61,6 +61,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
       - name: List build artifacts
+        shell: bash
         run: |
           echo "=== Build output ==="
           find src-tauri/target/release/bundle -type f 2>/dev/null || echo "No bundle directory"
