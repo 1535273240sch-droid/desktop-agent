@@ -47,8 +47,11 @@
   "plugins": {
     "updater": {
       "active": true,
-      "endpoints": [],
-      "pubkey": ""
+      "endpoints": [
+        "https://github.com/1535273240sch-droid/desktop-agent/releases/download/latest/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE5NDc4MjhCMjQ0QzFERTkKUldUcEhVd2tpNEpIcWR0c0lSQ1F1d2gybTVwNHBEdURodGxEbm5wS3BUeG1QZi9DMmpkN3lwNFAK",
+      "dangerous_insecure_transport_protocol": false
     }
   }
 }

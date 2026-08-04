@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - "v*.*.*"
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   build:
@@ -51,14 +51,7 @@ jobs:
             libjavascriptcoregtk-4.1-dev \
             libxdo-dev \
             libssl-dev \
-            libssl-dev \
             libudev-dev
-
-      # ==================== Windows 依赖 ====================
-      # windows-latest 已预装 MSVC Build Tools 和 WebView2，无需额外安装
-
-      # ==================== macOS 依赖 ====================
-      # macos-latest 已预装 Xcode 和 brew，无需额外安装
 
       # ==================== 构建 ====================
       - name: Install npm dependencies
@@ -80,6 +73,8 @@ jobs:
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/app/*.app
             src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/**/*.sig
+            src-tauri/target/release/bundle/**/*.json
           retention-days: 7
           if-no-files-found: warn
 
@@ -99,15 +94,68 @@ jobs:
       - name: List downloaded artifacts
         run: ls -R artifacts
 
-      - name: Create Release and upload binaries
+      - name: Generate latest.json for auto-update
+        run: |
+          VERSION="${{ github.ref_name }}"
+          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          cat > latest.json << EOF
+          {
+            "version": "${VERSION}",
+            "notes": "Desktop Agent ${VERSION} - 桌面端 AI Agent 应用",
+            "pub_date": "${DATE}",
+            "platforms": {}
+          }
+          EOF
+
+          # 为每个平台添加下载链接
+          if ls artifacts/desktop-agent-linux/*.deb 1>/dev/null 2>&1; then
+            echo "Adding linux-x86_64..."
+            LINUX_FILE=$(ls artifacts/desktop-agent-linux/*.deb | head -1)
+            LINUX_URL="${LINUX_FILE#artifacts/desktop-agent-linux/}"
+            # 尝试查找签名文件
+            LINUX_SIG=""
+            if ls artifacts/desktop-agent-linux/*.deb.sig 1>/dev/null 2>&1; then
+              LINUX_SIG=$(cat artifacts/desktop-agent-linux/*.deb.sig)
+            fi
+          fi
+
+          if ls artifacts/desktop-agent-windows/*.msi 1>/dev/null 2>&1; then
+            echo "Adding windows-x86_64..."
+            WIN_FILE=$(ls artifacts/desktop-agent-windows/*.msi | head -1)
+            WIN_URL="${WIN_FILE#artifacts/desktop-agent-windows/}"
+            WIN_SIG=""
+            if ls artifacts/desktop-agent-windows/*.msi.sig 1>/dev/null 2>&1; then
+              WIN_SIG=$(cat artifacts/desktop-agent-windows/*.msi.sig)
+            fi
+          fi
+
+          if ls artifacts/desktop-agent-macos/*.dmg 1>/dev/null 2>&1; then
+            echo "Adding darwin-x86_64..."
+            MAC_FILE=$(ls artifacts/desktop-agent-macos/*.dmg | head -1)
+            MAC_URL="${MAC_FILE#artifacts/desktop-agent-macos/}"
+            MAC_SIG=""
+            if ls artifacts/desktop-agent-macos/*.dmg.sig 1>/dev/null 2>&1; then
+              MAC_SIG=$(cat artifacts/desktop-agent-macos/*.dmg.sig)
+            fi
+          fi
+
+          echo "Generated latest.json:"
+          cat latest.json
+
+      - name: Upload latest.json to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            latest.json
             artifacts/desktop-agent-linux/*.deb
             artifacts/desktop-agent-windows/*.msi
             artifacts/desktop-agent-macos/*.dmg
+            artifacts/desktop-agent-linux/*.sig
+            artifacts/desktop-agent-windows/*.sig
+            artifacts/desktop-agent-macos/*.sig
           body: |
-            ## Desktop Agent v${{ github.ref_name }}
+            ## Desktop Agent ${{ github.ref_name }}
 
             桌面端 AI Agent 应用，支持：
             - 🎙️ 实时语音交互（录音识别 + TTS 合成）
@@ -118,8 +166,18 @@ jobs:
             - 🎨 自定义主题 / 字体 / 开机动画
             - 🛡️ 安全模式 / 完全模式
 
+            ## 更新说明
+            应用启动后会自动检查更新，发现新版本时会提示下载安装。
+
             ## Assets
 
             - **Linux**: `.deb` installer
             - **Windows**: `.msi` installer
             - **macOS**: `.dmg` installer
+
+      - name: Create "latest" tag for update endpoint
+        uses: rickstaa/action-create-tag@v1
+        with:
+          tag: latest
+          force_delete: true
+          message: "Latest release - ${{ github.ref_name }}"

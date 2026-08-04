@@ -177,32 +177,60 @@ pub fn run() {
 // ========================= 自动更新检查 =========================
 
 async fn check_for_updates(app: tauri::AppHandle) {
-    // 仅在 release 构建中尝试更新
     if cfg!(debug_assertions) {
         log::debug!("debug build, skip update check");
         return;
     }
-    match app.updater() {
-        Ok(updater) => match updater.check().await {
-            Ok(Some(update)) => {
-                log::info!(
-                    "update available: {} -> {}",
-                    update.current_version,
-                    update.version
-                );
-                if let Err(e) = update.download_and_install(|_, _| {}, || {}).await {
-                    log::warn!("update install failed: {e}");
-                }
-            }
-            Ok(None) => {
-                log::info!("app is up to date");
-            }
-            Err(e) => {
-                log::warn!("update check failed: {e}");
-            }
-        },
+
+    // 延迟 30 秒后检查（等待应用完全启动）
+    tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+
+    let updater = match app.updater() {
+        Ok(u) => u,
         Err(e) => {
             log::warn!("updater not available: {e}");
+            return;
+        }
+    };
+
+    match updater.check().await {
+        Ok(Some(update)) => {
+            log::info!(
+                "update available: {} -> {}",
+                update.current_version,
+                update.version
+            );
+            // 通知前端有新版本可用
+            let _ = app.emit(
+                "update-available",
+                serde_json::json!({
+                    "current": update.current_version,
+                    "latest": update.version,
+                    "notes": update.body,
+                }),
+            );
+            // 自动下载并安装
+            if let Err(e) = update
+                .download_and_install(
+                    |event, progress| {
+                        log::debug!("update download: {:?} {:?}", event, progress);
+                    },
+                    || {},
+                )
+                .await
+            {
+                log::warn!("update install failed: {e}");
+                let _ = app.emit(
+                    "update-error",
+                    serde_json::json!({ "error": format!("{e}") }),
+                );
+            }
+        }
+        Ok(None) => {
+            log::info!("app is up to date");
+        }
+        Err(e) => {
+            log::warn!("update check failed: {e}");
         }
     }
 }
