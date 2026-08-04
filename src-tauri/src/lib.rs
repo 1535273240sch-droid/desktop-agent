@@ -10,7 +10,7 @@ mod permissions;
 mod sandbox;
 
 use tauri::{
-    Manager, WindowEvent,
+    Emitter, Manager, WindowEvent,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
