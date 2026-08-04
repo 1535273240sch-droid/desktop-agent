@@ -1,0 +1,74 @@
+[package]
+name = "app"
+version = "0.1.0"
+description = "A Tauri App"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.11.3", features = ["tray-icon"] }
+tauri-plugin-log = "2"
+# HTTP 客户端（支持 streaming，仅 rustls，体积最小）
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"], default-features = false }
+# 异步运行时（按需启用特性，避免 "full" 引入不必要的 fs/net）
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "sync", "io-util", "fs", "time"] }
+# Tauri 插件
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-os = "2"
+tauri-plugin-process = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-updater = "2"
+# Key 安全存储
+keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native-sync-persistent"] }
+# 时间处理
+chrono = { version = "0.4", features = ["serde"] }
+# 唯一ID
+uuid = { version = "1", features = ["v4"] }
+# 异步锁与信号量
+tokio-util = "0.7"
+# base64
+base64 = "0.22"
+# Future工具
+futures-util = "0.3"
+# 文件系统glob
+glob = "0.3"
+# 错误派生
+thiserror = "1"
+
+# ========================= Release 体积优化 =========================
+# - opt-level="z": 体积优先优化
+# - lto="fat": 跨 crate 全链接优化，剔除未使用代码
+# - codegen-units=1: 单编译单元，最大化优化空间（编译变慢但产物更小）
+# - strip=true: 剥离调试符号
+# - panic="abort": 省略 unwind 表（需保证关键路径有 catch_unwind）
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
+incremental = false
+
+# 针对 Tauri 内部依赖也启用 size 优化
+[profile.release.package."*"]
+opt-level = "z"
+codegen-units = 1
+
